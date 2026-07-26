@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "event-market-capacity"
+version = "0.1.0"
+description = "Read-only capacity probe for settlement-matched cross-venue sports event markets."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+live = ["httpx>=0.27"]
+dev = ["pytest>=8", "httpx>=0.27"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

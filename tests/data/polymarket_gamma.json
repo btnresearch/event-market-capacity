@@ -1,0 +1,21 @@
+[
+  {
+    "_comment": "Hand-written to the DOCUMENTED shape of GET /markets on the Gamma API. Not a captured response. clobTokenIds arrives as a JSON-encoded string, which the parser has to decode.",
+    "id": "512345",
+    "question": "Will the Lakers beat the Celtics?",
+    "slug": "lakers-vs-celtics-2026-07-27",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "clobTokenIds": "[\"0xLALBOS-LAL-YES\", \"0xLALBOS-LAL-NO\"]",
+    "endDate": "2026-07-28T03:00:00Z",
+    "closed": false
+  },
+  {
+    "id": "512346",
+    "question": "Will the Yankees beat the Red Sox?",
+    "slug": "yankees-vs-red-sox-2026-07-27",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "clobTokenIds": ["0xNYYBOS-NYY-YES", "0xNYYBOS-NYY-NO"],
+    "endDate": "2026-07-27T21:00:00Z",
+    "closed": false
+  }
+]

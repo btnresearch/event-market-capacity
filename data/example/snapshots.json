@@ -1,0 +1,148 @@
+{
+  "_comment": [
+    "Synthetic snapshots. Hand-written to exercise all three probe gates, NOT captured",
+    "from any venue. Do not cite any number derived from this file as a market",
+    "observation. Three cross-venue pairs are represented:",
+    "  1. Lakers/Celtics  - fully verified terms, real crossing depth -> measured capacity",
+    "  2. Warriors/Heat   - 13c apparent gross edge, suppressed by an overtime-rule conflict",
+    "  3. Yankees/Red Sox - 8c apparent gross edge, suppressed as unverified (no void rule",
+    "     published on the Polymarket leg). data/example/settlement.json supplies the",
+    "     missing term so the same file can be re-run with the pair verified."
+  ],
+  "snapshots": [
+    {
+      "venue": "kalshi",
+      "market_id": "NBA-LALBOS-LAL",
+      "title": "Lakers to beat Celtics",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.52", 500], ["0.51", 1000]],
+        "asks": [["0.54", 800], ["0.55", 1500]]
+      },
+      "settlement": {
+        "event_key": "nba-2026-07-27-lal-bos",
+        "league": "NBA",
+        "participants": ["Los Angeles Lakers", "Boston Celtics"],
+        "scheduled_start_utc": "2026-07-27T23:00:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "Los Angeles Lakers",
+        "settlement_source": "NBA official final score",
+        "includes_overtime": true,
+        "void_rule": "void if not completed within 7 days of scheduled start"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xLALBOS-LAL-YES",
+      "title": "Will the Lakers beat the Celtics?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.57", 600], ["0.56", 900]],
+        "asks": [["0.58", 1000], ["0.59", 2000]]
+      },
+      "settlement": {
+        "event_key": "nba-2026-07-27-lal-bos",
+        "league": "NBA",
+        "participants": ["Boston Celtics", "Los Angeles Lakers"],
+        "scheduled_start_utc": "2026-07-27T23:00:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "Los Angeles Lakers",
+        "settlement_source": "NBA official final score",
+        "includes_overtime": true,
+        "void_rule": "void if not completed within 7 days of scheduled start"
+      }
+    },
+
+    {
+      "venue": "kalshi",
+      "market_id": "NBA-GSWMIA-GSW",
+      "title": "Warriors to beat Heat",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.30", 500]],
+        "asks": [["0.32", 1000]]
+      },
+      "settlement": {
+        "event_key": "nba-2026-07-28-gsw-mia",
+        "league": "NBA",
+        "participants": ["Golden State Warriors", "Miami Heat"],
+        "scheduled_start_utc": "2026-07-28T23:30:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "Golden State Warriors",
+        "settlement_source": "NBA official final score",
+        "includes_overtime": true,
+        "void_rule": "void if not completed within 7 days of scheduled start"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xGSWMIA-GSW-YES",
+      "title": "Will the Warriors beat the Heat in regulation?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.45", 1000]],
+        "asks": [["0.47", 1000]]
+      },
+      "settlement": {
+        "event_key": "nba-2026-07-28-gsw-mia",
+        "league": "NBA",
+        "participants": ["Golden State Warriors", "Miami Heat"],
+        "scheduled_start_utc": "2026-07-28T23:30:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "Golden State Warriors",
+        "settlement_source": "NBA official final score",
+        "includes_overtime": false,
+        "void_rule": "void if not completed within 7 days of scheduled start"
+      }
+    },
+
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-NYYBOS-NYY",
+      "title": "Yankees to beat Red Sox",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.60", 500]],
+        "asks": [["0.62", 1000]]
+      },
+      "settlement": {
+        "event_key": "mlb-2026-07-27-nyy-bos",
+        "league": "MLB",
+        "participants": ["New York Yankees", "Boston Red Sox"],
+        "scheduled_start_utc": "2026-07-27T17:05:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "New York Yankees",
+        "settlement_source": "MLB official final score",
+        "includes_overtime": true,
+        "void_rule": "void if suspended and not resumed within 48 hours"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xNYYBOS-NYY-YES",
+      "title": "Will the Yankees beat the Red Sox?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [["0.70", 800]],
+        "asks": [["0.72", 1000]]
+      },
+      "settlement": {
+        "event_key": "mlb-2026-07-27-nyy-bos",
+        "league": "MLB",
+        "participants": ["New York Yankees", "Boston Red Sox"],
+        "scheduled_start_utc": "2026-07-27T17:05:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "New York Yankees",
+        "settlement_source": "MLB official final score",
+        "includes_overtime": true,
+        "void_rule": null
+      }
+    }
+  ]
+}

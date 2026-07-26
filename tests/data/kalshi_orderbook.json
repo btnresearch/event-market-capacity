@@ -1,0 +1,7 @@
+{
+  "_comment": "Hand-written to the DOCUMENTED shape of GET /trade-api/v2/markets/{ticker}/orderbook. Not a captured response. Both ladders are resting bids, in cents: 'no' bids reflect to YES asks through 100. Levels are deliberately unsorted and include a duplicate price and a zero-size level to pin the parser's normalization.",
+  "orderbook": {
+    "yes": [[51, 200], [52, 300], [51, 100], [40, 0]],
+    "no": [[45, 400], [46, 100]]
+  }
+}

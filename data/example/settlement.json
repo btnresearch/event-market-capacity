@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Example curated settlement registry. The URLs and dates below are PLACEHOLDERS for",
+    "a synthetic market and cite nothing real; they exist to show the required shape.",
+    "A production entry must cite the venue rules page actually read, the date it was",
+    "read, and who read it. Entries without source_url and verified_on are rejected at",
+    "load time.",
+    "",
+    "This entry supplies the void rule that the Polymarket Yankees leg does not publish",
+    "in its market payload, which is what moves that pair from UNVERIFIED to MATCHED."
+  ],
+  "entries": [
+    {
+      "venue": "polymarket",
+      "market_id": "0xNYYBOS-NYY-YES",
+      "source_url": "https://example.invalid/placeholder-rules-page",
+      "verified_on": "2026-07-26",
+      "verified_by": "unassigned",
+      "note": "PLACEHOLDER. Synthetic market; no rules page was read. Replace before use.",
+      "terms": {
+        "event_key": "mlb-2026-07-27-nyy-bos",
+        "league": "MLB",
+        "participants": ["New York Yankees", "Boston Red Sox"],
+        "scheduled_start_utc": "2026-07-27T17:05:00+00:00",
+        "market_type": "moneyline",
+        "outcome": "New York Yankees",
+        "settlement_source": "MLB official final score",
+        "includes_overtime": true,
+        "void_rule": "void if suspended and not resumed within 48 hours"
+      }
+    }
+  ]
+}
