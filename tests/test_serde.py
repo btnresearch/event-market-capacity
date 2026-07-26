@@ -104,8 +104,69 @@ def test_write_then_load_is_stable(tmp_path):
 
 def test_example_file_loads_and_is_internally_consistent(example_dir):
     snapshots = load_snapshots(example_dir / "snapshots.json")
-    assert len(snapshots) == 6
+    assert len(snapshots) == 10
     for snap in snapshots:
         # Every example book must be a legal uncrossed book.
         if snap.book.bids and snap.book.asks:
             assert snap.book.best_bid < snap.book.best_ask
+
+
+def test_coded_settlement_fields_round_trip_by_value():
+    from conftest import terms
+
+    from emc.models import ExtraInnings
+    from emc.serde import settlement_from_dict, settlement_to_dict
+
+    original = terms()
+    as_dict = settlement_to_dict(original)
+    assert as_dict["extra_innings"] == "included"       # serialized as the code, not the enum
+    assert as_dict["market_type"] == "game_winner"
+    restored = settlement_from_dict(as_dict)
+    assert restored == original
+    assert restored.extra_innings is ExtraInnings.INCLUDED
+
+
+def test_an_unrecognized_rule_code_fails_loudly():
+    """A typo must not silently become None.
+
+    None reads downstream as "unverified", which would turn a data-entry error
+    into a settlement claim nobody checked.
+    """
+    from conftest import terms
+
+    from emc.serde import settlement_from_dict, settlement_to_dict
+
+    data = settlement_to_dict(terms())
+    data["extra_innings"] = "includes_overtime"  # plausible, and wrong
+    with pytest.raises(ValueError, match="unrecognized code for 'extra_innings'"):
+        settlement_from_dict(data)
+
+
+def test_every_coded_field_rejects_a_bad_value():
+    from conftest import terms
+
+    from emc.serde import settlement_from_dict, settlement_to_dict
+
+    for field in (
+        "market_type",
+        "extra_innings",
+        "tie_treatment",
+        "postponement",
+        "suspended",
+        "listed_pitcher",
+        "venue_change",
+    ):
+        data = settlement_to_dict(terms())
+        data[field] = "nonsense"
+        with pytest.raises(ValueError, match=f"unrecognized code for {field!r}"):
+            settlement_from_dict(data)
+
+
+def test_doubleheader_number_survives_the_round_trip():
+    from conftest import terms
+
+    from emc.serde import settlement_from_dict, settlement_to_dict
+
+    for dh in (0, 1, 2):
+        restored = settlement_from_dict(settlement_to_dict(terms(doubleheader_number=dh)))
+        assert restored.doubleheader_number == dh

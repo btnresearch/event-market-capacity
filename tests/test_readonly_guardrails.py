@@ -161,7 +161,7 @@ def test_cli_exposes_no_transacting_subcommand():
         and node.args
         and isinstance(node.args[0], ast.Constant)
     }
-    assert subcommands == {"probe", "capture"}
+    assert subcommands == {"screen", "probe", "capture"}
 
 
 def test_venue_clients_expose_only_read_methods():

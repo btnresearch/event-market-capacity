@@ -1,224 +1,257 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import timedelta
 from decimal import Decimal
 
-from conftest import T0, levels, snapshot, terms
+from conftest import T0, levels, other_game, snapshot, terms
 
-from emc.probe import PairStatus, run_probe
+from emc.models import ExtraInnings
+from emc.probe import PairStatus, canonical_event_key, run_probe
 from emc.registry import SettlementRegistry
 from emc.serde import load_snapshots
 
-ZERO = Decimal("0")
 
-
-def _pair(report, status):
+def of(report, status):
     return [p for p in report.pairs if p.status is status]
 
 
-# --- gates -----------------------------------------------------------------
+# --- gates ----------------------------------------------------------------
 
 
-def test_capture_skew_beyond_tolerance_excludes_the_pair(zero_costs):
-    buy = snapshot("kalshi", asks=levels(("0.40", 100)))
+def test_capture_skew_beyond_tolerance_excludes_the_pair(taker_costs, ample_capital):
+    buy = snapshot("kalshi", asks=levels(("0.62", 1000)))
     sell = snapshot(
-        "polymarket", bids=levels(("0.45", 100)), captured_at=T0 + timedelta(seconds=30)
+        "polymarket", bids=levels(("0.70", 800)), captured_at=T0 + timedelta(seconds=30)
     )
-    report = run_probe([buy, sell], zero_costs)
+    report = run_probe([buy, sell], taker_costs, ample_capital)
 
     assert report.counts[PairStatus.STALE_SKEW.value] == 1
-    assert not report.has_capacity
-    assert _pair(report, PairStatus.STALE_SKEW)[0].skew_seconds == Decimal("30.0")
+    assert report.capital_constrained_locked_profit_usd == Decimal(0)
+    assert of(report, PairStatus.STALE_SKEW)[0].skew_seconds == Decimal("30.0")
 
 
-def test_skew_tolerance_is_configurable(zero_costs):
-    buy = snapshot("kalshi", asks=levels(("0.40", 100)))
+def test_skew_is_checked_before_settlement_so_stale_pairs_are_not_miscounted(
+    taker_costs, ample_capital
+):
+    buy = snapshot("kalshi", asks=levels(("0.62", 1000)), settlement=terms(listed_pitcher=None))
     sell = snapshot(
-        "polymarket", bids=levels(("0.45", 100)), captured_at=T0 + timedelta(seconds=30)
+        "polymarket", bids=levels(("0.70", 800)), captured_at=T0 + timedelta(seconds=30)
     )
-    report = run_probe([buy, sell], zero_costs, max_skew=timedelta(seconds=60))
-    assert report.counts[PairStatus.MATCHED_WITH_CAPACITY.value] == 1
-
-
-def test_skew_is_checked_before_settlement_so_stale_pairs_are_not_miscounted(zero_costs):
-    buy = snapshot("kalshi", asks=levels(("0.40", 100)), settlement=terms(void_rule=None))
-    sell = snapshot(
-        "polymarket", bids=levels(("0.45", 100)), captured_at=T0 + timedelta(seconds=30)
-    )
-    report = run_probe([buy, sell], zero_costs)
+    report = run_probe([buy, sell], taker_costs, ample_capital)
     assert report.counts[PairStatus.STALE_SKEW.value] == 1
     assert report.counts[PairStatus.UNVERIFIED.value] == 0
 
 
-def test_mismatched_settlement_suppresses_a_large_apparent_edge(zero_costs):
+def test_mismatched_settlement_suppresses_a_large_apparent_edge(taker_costs, ample_capital):
+    """13c apparent cross, killed by an extra-innings conflict. No number leaks out."""
     buy = snapshot("kalshi", asks=levels(("0.32", 1000)))
     sell = snapshot(
-        "polymarket", bids=levels(("0.45", 1000)), settlement=terms(includes_overtime=False)
+        "polymarket",
+        bids=levels(("0.45", 1000)),
+        settlement=terms(extra_innings=ExtraInnings.REGULATION_ONLY),
     )
-    report = run_probe([buy, sell], zero_costs)
+    report = run_probe([buy, sell], taker_costs, ample_capital)
 
     assert report.counts[PairStatus.MISMATCHED.value] == 1
-    assert not report.has_capacity
-    # No curve is computed at all for a rejected pair, so no number can leak out.
-    assert _pair(report, PairStatus.MISMATCHED)[0].curve is None
+    assert report.capital_constrained_locked_profit_usd == Decimal(0)
+    assert of(report, PairStatus.MISMATCHED)[0].quote is None
 
 
-def test_unverified_settlement_also_suppresses_capacity(zero_costs):
+def test_unverified_settlement_also_suppresses_capacity(taker_costs, ample_capital):
     buy = snapshot("kalshi", asks=levels(("0.62", 1000)))
-    sell = snapshot("polymarket", bids=levels(("0.70", 800)), settlement=terms(void_rule=None))
-    report = run_probe([buy, sell], zero_costs)
+    sell = snapshot(
+        "polymarket", bids=levels(("0.70", 800)), settlement=terms(listed_pitcher=None)
+    )
+    report = run_probe([buy, sell], taker_costs, ample_capital)
 
     assert report.counts[PairStatus.UNVERIFIED.value] == 1
-    assert not report.has_capacity
-    assert _pair(report, PairStatus.UNVERIFIED)[0].curve is None
+    assert of(report, PairStatus.UNVERIFIED)[0].quote is None
 
 
-def test_matched_pair_with_no_cross_is_distinguished_from_a_rejected_one(zero_costs):
-    buy = snapshot("kalshi", asks=levels(("0.55", 1000)))
-    sell = snapshot("polymarket", bids=levels(("0.54", 1000)))
-    report = run_probe([buy, sell], zero_costs)
+def test_a_two_cent_cross_is_matched_but_yields_no_locked_profit(taker_costs, ample_capital):
+    """Verified pair, real cross, still no opportunity: fees exceed the spread.
 
-    assert report.counts[PairStatus.MATCHED_NO_CAPACITY.value] == 1
-    assert not report.has_capacity
-    # The distinction is the point: we verified this pair and there was no edge.
-    assert _pair(report, PairStatus.MATCHED_NO_CAPACITY)[0].curve is not None
+    This status is the whole point of the metric. It says "we looked and the
+    economics do not work", which is different from "we could not verify".
+    """
+    buy = snapshot("kalshi", asks=levels(("0.54", 800)))
+    sell = snapshot("polymarket", bids=levels(("0.56", 600)))
+    report = run_probe([buy, sell], taker_costs, ample_capital)
+
+    assert report.counts[PairStatus.MATCHED_NO_PROFIT.value] == 1
+    assert report.capital_constrained_locked_profit_usd == Decimal(0)
 
 
-# --- pairing ---------------------------------------------------------------
+def test_an_eight_cent_cross_clears_the_fee_floor(taker_costs, ample_capital):
+    buy = snapshot("kalshi", asks=levels(("0.62", 1000)))
+    sell = snapshot("polymarket", bids=levels(("0.70", 800)))
+    report = run_probe([buy, sell], taker_costs, ample_capital)
+
+    assert report.counts[PairStatus.LOCKED_PROFIT.value] == 1
+    quote = of(report, PairStatus.LOCKED_PROFIT)[0].quote
+    assert quote.locked_profit_usd == Decimal("42.40")
 
 
-def test_same_venue_pairs_are_not_measured(zero_costs):
+def test_maker_role_changes_the_verdict_on_the_same_books(
+    taker_costs, maker_costs, ample_capital
+):
+    snaps = [
+        snapshot("kalshi", asks=levels(("0.54", 800))),
+        snapshot("polymarket", bids=levels(("0.56", 600))),
+    ]
+    as_taker = run_probe(snaps, taker_costs, ample_capital)
+    as_maker = run_probe(snaps, maker_costs, ample_capital)
+
+    assert as_taker.counts[PairStatus.MATCHED_NO_PROFIT.value] == 1
+    assert as_maker.counts[PairStatus.LOCKED_PROFIT.value] == 1
+
+
+# --- event identity -------------------------------------------------------
+
+
+def test_canonical_key_includes_the_doubleheader_number():
+    k1 = canonical_event_key(terms(doubleheader_number=1))
+    k2 = canonical_event_key(terms(doubleheader_number=2))
+    assert k1 != k2
+    assert "dh1" in k1 and "dh2" in k2
+
+
+def test_canonical_key_is_none_without_teams_or_date():
+    assert canonical_event_key(terms(home_team=None, away_team=None)) is None
+    assert canonical_event_key(terms(game_date=None)) is None
+
+
+def test_canonical_key_is_order_independent_for_home_and_away():
+    a = canonical_event_key(terms())
+    b = canonical_event_key(terms(home_team="New York Yankees", away_team="Boston Red Sox"))
+    assert a == b
+
+
+def test_unidentifiable_markets_are_counted_not_paired(taker_costs, ample_capital):
+    orphan = snapshot("kalshi", asks=levels(("0.40", 100)), settlement=terms(game_date=None))
+    report = run_probe([orphan], taker_costs, ample_capital)
+    assert report.skipped_unidentifiable == 1
+    assert report.candidates_considered == 0
+
+
+def test_same_venue_pairs_are_not_measured(taker_costs, ample_capital):
     a = snapshot("kalshi", asks=levels(("0.40", 100)), market_id="a")
     b = snapshot("kalshi", bids=levels(("0.45", 100)), market_id="b")
-    report = run_probe([a, b], zero_costs)
+    assert run_probe([a, b], taker_costs, ample_capital).candidates_considered == 0
+
+
+def test_different_events_are_never_paired(taker_costs, ample_capital):
+    a = snapshot("kalshi", asks=levels(("0.40", 100)))
+    b = snapshot("polymarket", bids=levels(("0.90", 100)), settlement=other_game())
+    report = run_probe([a, b], taker_costs, ample_capital)
     assert report.candidates_considered == 0
 
 
-def test_markets_without_participants_are_counted_as_unpairable(zero_costs):
-    orphan = snapshot(
-        "kalshi", asks=levels(("0.40", 100)), settlement=terms(participants=frozenset())
-    )
-    report = run_probe([orphan], zero_costs)
-    assert report.skipped_unpairable == 1
-    assert report.candidates_considered == 0
-
-
-def test_different_events_are_never_paired(zero_costs):
-    lakers = snapshot("kalshi", asks=levels(("0.40", 100)))
-    yankees = snapshot(
-        "polymarket",
-        bids=levels(("0.90", 100)),
-        settlement=terms(
-            league="MLB", participants=frozenset({"New York Yankees", "Boston Red Sox"})
-        ),
-    )
-    report = run_probe([lakers, yankees], zero_costs)
-    assert report.candidates_considered == 0
-    assert not report.has_capacity
-
-
-def test_probe_picks_the_profitable_direction(zero_costs):
-    """Order of arguments must not decide the answer."""
-    cheap = snapshot("kalshi", asks=levels(("0.40", 100)))
-    rich = snapshot("polymarket", bids=levels(("0.45", 100)))
+def test_probe_picks_the_profitable_direction(taker_costs, ample_capital):
+    """Argument order must not decide the answer."""
+    cheap = snapshot("kalshi", asks=levels(("0.62", 1000)))
+    rich = snapshot("polymarket", bids=levels(("0.70", 800)))
     for pair in ([cheap, rich], [rich, cheap]):
-        report = run_probe(pair, zero_costs)
-        curve = _pair(report, PairStatus.MATCHED_WITH_CAPACITY)[0].curve
-        assert (curve.buy_venue, curve.sell_venue) == ("kalshi", "polymarket")
-        assert curve.at(ZERO).contracts == 100
+        report = run_probe(pair, taker_costs, ample_capital)
+        obs = report.observations[0]
+        assert obs.yes_ref.venue == "kalshi"
+        assert obs.no_ref.venue == "polymarket"
 
 
-def test_capacity_sums_across_independent_pairs(zero_costs):
-    a1 = snapshot("kalshi", asks=levels(("0.40", 100)), market_id="k1")
-    a2 = snapshot("polymarket", bids=levels(("0.45", 100)), market_id="p1")
-    other = terms(league="MLB", participants=frozenset({"New York Yankees", "Boston Red Sox"}))
-    b1 = snapshot("kalshi", asks=levels(("0.40", 200)), market_id="k2", settlement=other)
-    b2 = snapshot("polymarket", bids=levels(("0.45", 200)), market_id="p2", settlement=other)
+# --- shared capital -------------------------------------------------------
 
-    report = run_probe([a1, a2, b1, b2], zero_costs)
+
+def test_simultaneous_pairs_do_not_double_count_venue_capital(taker_costs):
+    """Two 8c crosses on different games competing for one kalshi balance."""
+    g1, g2 = terms(), other_game()
+    snaps = [
+        snapshot("kalshi", asks=levels(("0.62", 1000)), market_id="k1", settlement=g1),
+        snapshot("polymarket", bids=levels(("0.70", 800)), market_id="p1", settlement=g1),
+        snapshot("kalshi", asks=levels(("0.62", 1000)), market_id="k2", settlement=g2),
+        snapshot("polymarket", bids=levels(("0.70", 800)), market_id="p2", settlement=g2),
+    ]
+    budget = {"kalshi": Decimal("500"), "polymarket": Decimal("500")}
+    report = run_probe(snaps, taker_costs, budget)
+
     assert report.candidates_considered == 2
-    assert report.aggregate_at(ZERO).contracts == 300
-    assert report.aggregate_at(ZERO).profit_usd == Decimal("15.00")
+    assert report.uncapped_locked_profit_usd == Decimal("84.80")
+    assert report.capital_constrained_locked_profit_usd < report.uncapped_locked_profit_usd
+    assert report.allocation.capital_used["kalshi"] <= Decimal("500")
+    assert report.allocation.capital_used["polymarket"] <= Decimal("500")
 
 
-# --- end to end on the committed example ----------------------------------
+def test_report_distinguishes_uncapped_from_capital_constrained(taker_costs):
+    snaps = [
+        snapshot("kalshi", asks=levels(("0.62", 1000))),
+        snapshot("polymarket", bids=levels(("0.70", 800))),
+    ]
+    tiny = run_probe(snaps, taker_costs, {"kalshi": Decimal("62"), "polymarket": Decimal("30")})
+    assert tiny.uncapped_locked_profit_usd == Decimal("42.40")
+    assert tiny.capital_constrained_locked_profit_usd < Decimal("42.40")
 
 
-def test_example_snapshots_exercise_all_three_outcomes(example_dir, realistic_costs):
-    snapshots = load_snapshots(example_dir / "snapshots.json")
-    report = run_probe(snapshots, realistic_costs)
+def test_missing_cost_model_is_an_error_not_an_implicit_zero(ample_capital):
+    a = snapshot("kalshi", asks=levels(("0.62", 1000)))
+    b = snapshot("polymarket", bids=levels(("0.70", 800)))
+    import pytest
 
-    assert report.snapshots_considered == 6
-    assert report.candidates_considered == 3
-    assert report.counts[PairStatus.MATCHED_WITH_CAPACITY.value] == 1
+    with pytest.raises(ValueError, match="no cost model"):
+        run_probe([a, b], {}, ample_capital)
+
+
+# --- end to end on the committed example ---------------------------------
+
+
+def test_example_exercises_every_gate(example_dir, taker_costs, ample_capital):
+    report = run_probe(load_snapshots(example_dir / "snapshots.json"), taker_costs, ample_capital)
+
+    assert report.snapshots_considered == 10
+    assert report.candidates_considered == 4  # the doubleheader pair never pairs
+    assert report.counts[PairStatus.LOCKED_PROFIT.value] == 1
+    assert report.counts[PairStatus.MATCHED_NO_PROFIT.value] == 1
     assert report.counts[PairStatus.MISMATCHED.value] == 1
     assert report.counts[PairStatus.UNVERIFIED.value] == 1
 
 
-def test_example_capacity_shows_fees_consuming_most_of_the_gross_edge(
-    example_dir, realistic_costs
-):
-    """The headline result: a 3-cent gross cross is a 1.25-cent net one.
-
-    Kalshi-style fees at a near-coin-flip price take 1.74c per contract of the 3c
-    gross edge, and the second slice at 2c gross barely clears zero.
-    """
-    snapshots = load_snapshots(example_dir / "snapshots.json")
-    report = run_probe(snapshots, realistic_costs)
-
-    breakeven = report.aggregate_at(ZERO)
-    assert breakeven.contracts == 800
-    assert breakeven.capital_usd == Decimal("778.00")
-    assert breakeven.profit_usd == Decimal("7.98")
-
-    at_one_cent = report.aggregate_at(Decimal("0.01"))
-    assert at_one_cent.contracts == 600
-    assert at_one_cent.capital_usd == Decimal("582.00")
-    assert at_one_cent.profit_usd == Decimal("7.51")
-
-    # Nothing survives a 2-cent net-edge requirement.
-    assert report.aggregate_at(Decimal("0.02")).contracts == 0
+def test_example_doubleheader_pair_is_never_considered(example_dir, taker_costs, ample_capital):
+    """Game 1 and game 2 land in different buckets, so they are not even candidates."""
+    report = run_probe(load_snapshots(example_dir / "snapshots.json"), taker_costs, ample_capital)
+    refs = {f"{p.left.market_id}|{p.right.market_id}" for p in report.pairs}
+    assert not any("G1" in r and "G2" in r for r in refs)
 
 
 def test_registry_converts_an_unverified_pair_into_a_measured_one(
-    example_dir, realistic_costs
+    example_dir, taker_costs, ample_capital
 ):
-    snapshots = load_snapshots(example_dir / "snapshots.json")
+    snaps = load_snapshots(example_dir / "snapshots.json")
     registry = SettlementRegistry.load(example_dir / "settlement.json")
-    report = run_probe(registry.apply_all(snapshots), realistic_costs)
+    report = run_probe(registry.apply_all(snaps), taker_costs, ample_capital)
 
-    assert report.counts[PairStatus.MATCHED_WITH_CAPACITY.value] == 2
     assert report.counts[PairStatus.UNVERIFIED.value] == 0
-    # The Yankees pair crosses by 8c on 800 contracts.
-    assert report.aggregate_at(Decimal("0.05")).contracts == 800
-    assert report.aggregate_at(Decimal("0.05")).profit_usd == Decimal("50.75")
+    assert report.counts[PairStatus.LOCKED_PROFIT.value] == 2
 
 
-def test_report_serializes_decimals_as_strings(example_dir, realistic_costs):
+def test_report_serializes_decimals_as_strings(example_dir, taker_costs, ample_capital):
     import json
 
-    snapshots = load_snapshots(example_dir / "snapshots.json")
-    payload = run_probe(snapshots, realistic_costs).as_dict()
+    report = run_probe(load_snapshots(example_dir / "snapshots.json"), taker_costs, ample_capital)
+    payload = report.as_dict()
     text = json.dumps(payload)  # must not raise on Decimal
 
-    assert json.loads(text)["aggregate"][0]["capital_usd"] == "778.00"
+    assert isinstance(json.loads(text)["uncapped_locked_profit_usd"], str)
     reasons = [p["verdict"]["reasons"] for p in payload["pairs"] if p["verdict"]]
-    assert any(reasons), "rejected pairs must explain themselves in the report"
+    assert any(reasons), "rejected pairs must explain themselves"
 
 
-def test_report_counts_every_status_key_even_when_zero(zero_costs):
-    report = run_probe([], zero_costs)
+def test_empty_input_reports_every_status_key(taker_costs, ample_capital):
+    report = run_probe([], taker_costs, ample_capital)
     assert set(report.counts) == {s.value for s in PairStatus}
     assert report.snapshots_considered == 0
+    assert report.uncapped_locked_profit_usd == Decimal(0)
 
 
 def test_crossed_snapshot_never_reaches_the_probe():
-    """A single-venue crossed book is rejected at construction, not measured.
-
-    Guarding here rather than in the probe means there is no code path on which a
-    bad read becomes a capacity number.
-    """
+    """A crossed single-venue book is rejected at construction, not measured."""
     import pytest
 
     from emc.models import CrossedBookError

@@ -1,15 +1,21 @@
 """Core value types.
 
-Prices are ``Decimal`` in probability units: 0 < price < 1, where price is the
-cost in dollars of a contract that pays $1 if the event resolves YES. Decimal is
-used rather than float because edge thresholds are compared exactly and a
-sub-cent float artifact is the difference between "opportunity" and "noise".
+Prices are ``Decimal`` in probability units: 0 < price < 1, the cost in dollars of
+a contract paying $1 on YES. Decimal, never float, because edge thresholds are
+compared exactly and a sub-cent binary artifact is the difference between
+"opportunity" and "noise".
 
-Every book in this package is expressed in YES-price space. A venue that quotes
-a separate NO book is normalized on ingest: buying NO at price ``q`` is
-economically identical to selling YES at ``1 - q``, so a NO ask of ``q`` becomes
-a YES bid of ``1 - q``. This normalization is what lets a two-leg
-settlement-matched position be measured as a single cross-venue spread.
+Every book is expressed in YES-price space. A venue quoting a separate NO book is
+normalized on ingest: a NO ask of ``q`` becomes a YES bid of ``1 - q``.
+
+SETTLEMENT TERMS ARE CODED, NOT PROSE
+-------------------------------------
+An earlier version compared ``void_rule`` as free text. That is worse than
+useless: two venues never phrase the same rule identically, so economically
+equivalent contracts were reported as MISMATCHED — a positive claim that they
+settle differently, which was false. Canonical rule fields are now enumerated
+codes. Mapping a venue's prose to a code is a human judgement recorded with a
+citation in :mod:`emc.registry`; the code is what calculations compare.
 """
 
 from __future__ import annotations
@@ -21,36 +27,36 @@ from enum import Enum
 
 __all__ = [
     "BookLevel",
-    "CapacityCurve",
-    "CapacityPoint",
     "CrossedBookError",
+    "ExtraInnings",
+    "ListedPitcherRule",
     "MarketRef",
     "MarketSnapshot",
+    "MarketType",
     "MatchStatus",
     "MatchVerdict",
     "OrderBook",
+    "PostponementTreatment",
     "SettlementTerms",
+    "SuspendedTreatment",
+    "TieTreatment",
     "price",
+    "utcnow",
 ]
 
 ONE = Decimal("1")
 
 
 class CrossedBookError(ValueError):
-    """Raised when a venue reports a book whose best bid is at or above its best ask.
+    """A venue reported a book whose best bid is at or above its best ask.
 
-    This is a data-quality fault, not an opportunity. A single-venue crossed book
-    means the snapshot is internally inconsistent (mid-update read, stale side,
-    or a parser bug), and any capacity computed from it is fiction.
+    A data-quality fault, not an opportunity: the snapshot is internally
+    inconsistent and any capacity computed from it is fiction.
     """
 
 
 def price(value: str | int | float | Decimal) -> Decimal:
-    """Coerce a quote to Decimal probability units, rejecting out-of-range values.
-
-    Floats are routed through ``repr`` so that ``0.07`` becomes ``Decimal("0.07")``
-    rather than its binary expansion.
-    """
+    """Coerce a quote to Decimal probability units, rejecting out-of-range values."""
     if isinstance(value, Decimal):
         out = value
     elif isinstance(value, float):
@@ -64,8 +70,6 @@ def price(value: str | int | float | Decimal) -> Decimal:
 
 @dataclass(frozen=True, slots=True)
 class BookLevel:
-    """One resting price level. ``size`` is in contracts."""
-
     price: Decimal
     size: int
 
@@ -78,10 +82,10 @@ class BookLevel:
 
 @dataclass(frozen=True, slots=True)
 class OrderBook:
-    """Resting depth on one side of one market, in YES-price space.
+    """Resting depth for one market in YES-price space.
 
-    ``bids`` must be strictly descending, ``asks`` strictly ascending. Either side
-    may be empty; an empty side simply means no capacity in that direction.
+    ``bids`` strictly descending, ``asks`` strictly ascending. Either side may be
+    empty.
     """
 
     bids: tuple[BookLevel, ...] = ()
@@ -92,7 +96,9 @@ class OrderBook:
             prices = [lvl.price for lvl in levels]
             ordered = sorted(prices, reverse=not ascending)
             if prices != ordered or len(set(prices)) != len(prices):
-                raise ValueError(f"{name} must be strictly {'ascending' if ascending else 'descending'}: {prices}")
+                raise ValueError(
+                    f"{name} must be strictly {'ascending' if ascending else 'descending'}: {prices}"
+                )
         if self.bids and self.asks and self.bids[0].price >= self.asks[0].price:
             raise CrossedBookError(
                 f"best bid {self.bids[0].price} >= best ask {self.asks[0].price}"
@@ -115,12 +121,107 @@ class OrderBook:
         return sum(lvl.size for lvl in self.asks)
 
 
+# --- Canonical settlement codes -------------------------------------------
+
+
+class MarketType(str, Enum):
+    GAME_WINNER = "game_winner"
+    RUN_LINE = "run_line"
+    TOTAL = "total"
+    SERIES_WINNER = "series_winner"
+
+
+class ExtraInnings(str, Enum):
+    """Whether the result includes extra innings, or is regulation-only."""
+
+    INCLUDED = "included"
+    REGULATION_ONLY = "regulation_only"
+
+
+class TieTreatment(str, Enum):
+    IMPOSSIBLE = "impossible"      # MLB game-winner: a tie cannot be the final state
+    VOID = "void"
+    PUSH = "push"
+
+
+class PostponementTreatment(str, Enum):
+    """What happens if the game is not played as scheduled."""
+
+    VOID_IF_NOT_PLAYED_IN_WINDOW = "void_if_not_played_in_window"
+    FOLLOWS_RESCHEDULED_GAME = "follows_rescheduled_game"
+    VOID_IMMEDIATELY = "void_immediately"
+
+
+class SuspendedTreatment(str, Enum):
+    OFFICIAL_IF_REGULATION_COMPLETE = "official_if_regulation_complete"
+    VOID_UNLESS_COMPLETED = "void_unless_completed"
+    FOLLOWS_LEAGUE_RULING = "follows_league_ruling"
+
+
+class ListedPitcherRule(str, Enum):
+    NOT_REQUIRED = "not_required"
+    BOTH_MUST_START = "both_must_start"
+    ONE_MUST_START = "one_must_start"
+
+
+class VenueChangeTreatment(str, Enum):
+    NO_EFFECT = "no_effect"
+    VOID_IF_RELOCATED = "void_if_relocated"
+
+
+@dataclass(frozen=True, slots=True)
+class SettlementTerms:
+    """The canonical settlement record.
+
+    ``None`` means the venue did not publish this field or the adapter could not
+    extract it. Missing fields drive an ``UNVERIFIED`` verdict; they are never
+    treated as agreement.
+
+    ``doubleheader_number`` is load-bearing for MLB. Two games between the same
+    teams on the same date are distinct events, and a matcher keyed only on teams
+    and league would happily pair game 1 against game 2.
+    """
+
+    sport: str | None = None
+    league: str | None = None
+    home_team: str | None = None
+    away_team: str | None = None
+    game_date: str | None = None                       # ISO date in the league's local convention
+    doubleheader_number: int | None = None             # 0 = single game, 1/2 = DH game number
+    scheduled_start_utc: datetime | None = None
+    market_type: MarketType | None = None
+    outcome_team: str | None = None                    # which team this contract pays on
+    extra_innings: ExtraInnings | None = None
+    tie_treatment: TieTreatment | None = None
+    postponement: PostponementTreatment | None = None
+    postponement_window_hours: int | None = None
+    suspended: SuspendedTreatment | None = None
+    listed_pitcher: ListedPitcherRule | None = None
+    minimum_innings: Decimal | None = None
+    venue_change: VenueChangeTreatment | None = None
+    settlement_source: str | None = None
+    settlement_deadline_utc: datetime | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("scheduled_start_utc", "settlement_deadline_utc"):
+            value = getattr(self, name)
+            if value is not None and value.tzinfo is None:
+                raise ValueError(f"{name} must be timezone-aware")
+        if self.doubleheader_number is not None and self.doubleheader_number < 0:
+            raise ValueError("doubleheader_number must be non-negative")
+
+    @property
+    def participants(self) -> frozenset[str]:
+        return frozenset(t for t in (self.home_team, self.away_team) if t)
+
+
 class MatchStatus(str, Enum):
     """Outcome of settlement-equivalence adjudication.
 
-    ``UNVERIFIED`` is not a soft ``MATCHED``. It means the evidence needed to
-    prove the two contracts settle identically is absent, so the pair carries
-    unmeasured settlement risk and must not be counted as capacity.
+    ``UNVERIFIED`` is not a soft ``MATCHED``. It means the evidence needed to prove
+    identical settlement is absent, so the pair carries unmeasured settlement risk.
+    ``MISMATCHED`` is a positive claim that the two contracts settle differently,
+    and is only issued when two coded fields actually conflict.
     """
 
     MATCHED = "matched"
@@ -139,34 +240,7 @@ class MatchVerdict:
 
 
 @dataclass(frozen=True, slots=True)
-class SettlementTerms:
-    """The resolution contract, normalized for comparison across venues.
-
-    A field left as ``None`` means "the venue did not publish this, or the
-    adapter could not extract it". Missing fields drive an ``UNVERIFIED`` verdict
-    rather than being treated as agreement.
-    """
-
-    event_key: str | None = None
-    league: str | None = None
-    participants: frozenset[str] = frozenset()
-    scheduled_start_utc: datetime | None = None
-    market_type: str | None = None
-    outcome: str | None = None
-    settlement_source: str | None = None
-    includes_overtime: bool | None = None
-    void_rule: str | None = None
-
-    def __post_init__(self) -> None:
-        start = self.scheduled_start_utc
-        if start is not None and start.tzinfo is None:
-            raise ValueError("scheduled_start_utc must be timezone-aware")
-
-
-@dataclass(frozen=True, slots=True)
 class MarketRef:
-    """Enough to identify a market on a venue without having fetched its book."""
-
     venue: str
     market_id: str
     title: str | None = None
@@ -176,9 +250,9 @@ class MarketRef:
 class MarketSnapshot:
     """One venue's book for one market at one instant.
 
-    ``captured_at`` is load-bearing. Two books read seconds apart can show an
-    edge that never simultaneously existed, so the probe compares capture times
-    before it compares prices.
+    ``captured_at`` is load-bearing: two books read seconds apart can show an edge
+    that never simultaneously existed, so the probe compares capture times before
+    it compares prices.
     """
 
     venue: str
@@ -200,48 +274,5 @@ class MarketSnapshot:
         return MarketRef(venue=self.venue, market_id=self.market_id, title=self.title)
 
 
-@dataclass(frozen=True, slots=True)
-class CapacityPoint:
-    """Capacity available at or above one net-edge threshold.
-
-    ``capital_usd`` is the cash a settlement-matched two-leg position ties up:
-    buying YES at the cheap venue's ask and NO at the rich venue's implied ask
-    costs ``ask + (1 - bid)`` per contract and returns exactly the payout at
-    settlement. ``profit_usd`` is that payout minus total cost minus fees.
-    """
-
-    min_net_edge: Decimal
-    contracts: int
-    capital_usd: Decimal
-    profit_usd: Decimal
-    worst_net_edge: Decimal | None
-
-    @property
-    def return_on_capital(self) -> Decimal | None:
-        if self.capital_usd <= 0:
-            return None
-        return self.profit_usd / self.capital_usd
-
-
-@dataclass(frozen=True, slots=True)
-class CapacityCurve:
-    """Capacity as a function of the net edge demanded, for one matched pair."""
-
-    buy_venue: str
-    sell_venue: str
-    points: tuple[CapacityPoint, ...] = ()
-
-    def at(self, threshold: Decimal) -> CapacityPoint | None:
-        for point in self.points:
-            if point.min_net_edge == threshold:
-                return point
-        return None
-
-    @property
-    def has_capacity(self) -> bool:
-        return any(p.contracts > 0 for p in self.points)
-
-
 def utcnow() -> datetime:
-    """Timezone-aware now, for callers that need a capture timestamp."""
     return datetime.now(timezone.utc)

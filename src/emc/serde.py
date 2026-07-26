@@ -1,10 +1,16 @@
-"""Snapshot serialization.
+"""Snapshot and settlement serialization.
 
-One format is shared by fixtures, recorded captures, and the CLI, so that a
-capture taken from a live venue can be replayed through the exact code path the
-tests exercise. Prices are written as decimal *strings*, never JSON numbers: a
-round trip through a float would perturb quotes at the fourth decimal place,
-which is the same order of magnitude as the edges being measured.
+One format is shared by fixtures, recorded captures, and the CLI, so a capture
+taken from a live venue replays through the exact code path the tests exercise.
+
+Prices are written as decimal *strings*, never JSON numbers: a round trip through
+a float perturbs quotes in the fourth decimal place, the same order of magnitude
+as the edges being measured.
+
+Coded settlement fields are serialized by their enum value and are rejected on
+load if unrecognized. A typo in a rule code must fail loudly rather than silently
+becoming ``None``, because ``None`` reads downstream as "unverified" and would
+quietly turn a data-entry error into a settlement claim nobody checked.
 """
 
 from __future__ import annotations
@@ -13,10 +19,23 @@ import json
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
 from decimal import Decimal
+from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
-from emc.models import BookLevel, MarketSnapshot, OrderBook, SettlementTerms
+from emc.models import (
+    BookLevel,
+    ExtraInnings,
+    ListedPitcherRule,
+    MarketSnapshot,
+    MarketType,
+    OrderBook,
+    PostponementTreatment,
+    SettlementTerms,
+    SuspendedTreatment,
+    TieTreatment,
+    VenueChangeTreatment,
+)
 
 __all__ = [
     "load_snapshots",
@@ -26,6 +45,28 @@ __all__ = [
     "snapshot_to_dict",
     "write_snapshots",
 ]
+
+E = TypeVar("E", bound=Enum)
+
+_CODED_FIELDS: dict[str, type[Enum]] = {
+    "market_type": MarketType,
+    "extra_innings": ExtraInnings,
+    "tie_treatment": TieTreatment,
+    "postponement": PostponementTreatment,
+    "suspended": SuspendedTreatment,
+    "listed_pitcher": ListedPitcherRule,
+    "venue_change": VenueChangeTreatment,
+}
+
+_PLAIN_FIELDS = (
+    "sport",
+    "league",
+    "home_team",
+    "away_team",
+    "game_date",
+    "outcome_team",
+    "settlement_source",
+)
 
 
 def _parse_dt(value: Any) -> datetime:
@@ -39,37 +80,53 @@ def _parse_dt(value: Any) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _coded(field: str, enum_cls: type[E], value: Any) -> E | None:
+    if value is None:
+        return None
+    if isinstance(value, enum_cls):
+        return value
+    try:
+        return enum_cls(value)
+    except ValueError as exc:
+        valid = sorted(m.value for m in enum_cls)
+        raise ValueError(
+            f"unrecognized code for {field!r}: {value!r}; valid values are {valid}"
+        ) from exc
+
+
 def settlement_from_dict(data: dict[str, Any] | None) -> SettlementTerms:
     if not data:
         return SettlementTerms()
-    start = data.get("scheduled_start_utc")
-    return SettlementTerms(
-        event_key=data.get("event_key"),
-        league=data.get("league"),
-        participants=frozenset(data.get("participants") or ()),
-        scheduled_start_utc=None if start is None else _parse_dt(start),
-        market_type=data.get("market_type"),
-        outcome=data.get("outcome"),
-        settlement_source=data.get("settlement_source"),
-        includes_overtime=data.get("includes_overtime"),
-        void_rule=data.get("void_rule"),
-    )
+    kwargs: dict[str, Any] = {name: data.get(name) for name in _PLAIN_FIELDS}
+    for name, enum_cls in _CODED_FIELDS.items():
+        kwargs[name] = _coded(name, enum_cls, data.get(name))
+
+    dh = data.get("doubleheader_number")
+    kwargs["doubleheader_number"] = None if dh is None else int(dh)
+    window = data.get("postponement_window_hours")
+    kwargs["postponement_window_hours"] = None if window is None else int(window)
+    innings = data.get("minimum_innings")
+    kwargs["minimum_innings"] = None if innings is None else Decimal(str(innings))
+    for name in ("scheduled_start_utc", "settlement_deadline_utc"):
+        raw = data.get(name)
+        kwargs[name] = None if raw is None else _parse_dt(raw)
+    return SettlementTerms(**kwargs)
 
 
 def settlement_to_dict(terms: SettlementTerms) -> dict[str, Any]:
-    return {
-        "event_key": terms.event_key,
-        "league": terms.league,
-        "participants": sorted(terms.participants),
-        "scheduled_start_utc": (
-            None if terms.scheduled_start_utc is None else terms.scheduled_start_utc.isoformat()
-        ),
-        "market_type": terms.market_type,
-        "outcome": terms.outcome,
-        "settlement_source": terms.settlement_source,
-        "includes_overtime": terms.includes_overtime,
-        "void_rule": terms.void_rule,
-    }
+    out: dict[str, Any] = {name: getattr(terms, name) for name in _PLAIN_FIELDS}
+    for name in _CODED_FIELDS:
+        value = getattr(terms, name)
+        out[name] = None if value is None else value.value
+    out["doubleheader_number"] = terms.doubleheader_number
+    out["postponement_window_hours"] = terms.postponement_window_hours
+    out["minimum_innings"] = (
+        None if terms.minimum_innings is None else str(terms.minimum_innings)
+    )
+    for name in ("scheduled_start_utc", "settlement_deadline_utc"):
+        value = getattr(terms, name)
+        out[name] = None if value is None else value.isoformat()
+    return out
 
 
 def _levels_from(raw: Sequence[Any]) -> tuple[BookLevel, ...]:
@@ -86,7 +143,6 @@ def _levels_from(raw: Sequence[Any]) -> tuple[BookLevel, ...]:
 
 
 def snapshot_from_dict(data: dict[str, Any]) -> MarketSnapshot:
-    """Build a snapshot, letting model validation reject malformed books."""
     for required in ("venue", "market_id", "captured_at", "book"):
         if required not in data:
             raise ValueError(f"snapshot missing required field {required!r}")
@@ -121,11 +177,7 @@ def snapshot_to_dict(snapshot: MarketSnapshot) -> dict[str, Any]:
 
 
 def load_snapshots(path: str | Path) -> tuple[MarketSnapshot, ...]:
-    """Load snapshots from a JSON file, a JSONL file, or a directory of either.
-
-    Accepts a bare list, a ``{"snapshots": [...]}`` wrapper, or one object per
-    line, so a hand-written fixture and a streamed capture both work.
-    """
+    """Load snapshots from a JSON file, a JSONL file, or a directory of either."""
     target = Path(path)
     if target.is_dir():
         out: list[MarketSnapshot] = []

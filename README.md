@@ -2,104 +2,105 @@
 
 Capacity research for cross-venue sports event markets.
 
-A read-only probe that measures one thing: for pairs of contracts that provably
-settle on the same event under the same rules, how much capital fits at a given
-net edge, given the depth actually resting on both books at one instant.
+A read-only probe answering one question: for pairs of contracts that provably
+settle on the same event under the same rules, how much **locked profit** is
+quoted, net of exact fees, across real depth, within a shared capital budget?
+
+**Current defensible revenue forecast: $0.** See [STATUS.md](STATUS.md).
+
+## The headline result
+
+```
+$ python -m emc.cli screen
+
+    price  taker/taker  taker/maker  maker/taker  maker/maker
+     0.40      2.880c      1.680c      1.620c      0.420c
+     0.50      3.000c      1.750c      1.688c      0.438c
+     0.60      2.880c      1.680c      1.620c      0.420c
+```
+
+Both venues charge `rate × contracts × price × (1 − price)`, which peaks at 0.50 —
+exactly where competitive MLB game-winner markets trade. A two-leg taker/taker
+locked position therefore needs a **3-cent** gross cross-venue spread just to break
+even. At an extreme 4c cross, $250k/yr requires 138,889 contracts and ~$133,000 of
+capital *per slate*.
+
+That kills settlement-matched cross-venue arbitrage as a $250k route, from the fee
+schedules alone, with no live data. Details in [DECISIONS.md](DECISIONS.md).
 
 ## Scope
 
-This is a measurement tool. It reads public quote data and computes a property of
-it.
+A measurement tool. It reads public quote data and computes a property of it.
 
 It does **not** submit orders, trade, wager, forecast outcomes, or authenticate to
-any venue. Every venue adapter issues unauthenticated HTTP GET requests against
-public market-data endpoints. Those constraints are enforced by
-`tests/test_readonly_guardrails.py`, which parses every module and fails the build
-on any credential construct, mutating HTTP verb, order-management path, modelling
-dependency, or new CLI subcommand.
+any venue. `tests/test_readonly_guardrails.py` parses every module and fails the
+build on any credential construct, mutating HTTP verb, order-management path,
+modelling dependency, or new CLI subcommand.
 
 ## Quickstart
 
 ```bash
 pip install -e '.[dev]'
-python -m pytest                     # 196 tests, no network required
+python -m pytest                       # 264 tests, no network required
 
-python -m emc.cli probe --snapshots data/example/snapshots.json
+python -m emc.cli screen               # fee floor + revenue gates, no data needed
+python -m emc.cli probe --snapshots data/example/snapshots.json \
+                        --capital kalshi=50000,polymarket=50000
 ```
 
-```
-pair adjudication
-  matched_with_capacity    1
-  matched_no_capacity      0
-  mismatched               1
-  unverified               1
-  stale_skew               0
-
-capacity at net edge (per contract, $1 payout)
-    min edge  contracts        capital         profit      ROC
-  ------------------------------------------------------------
-           0        800 $      778.00 $        7.98    1.03%
-        0.01        600 $      582.00 $        7.51    1.29%
-        0.02          0 $        0.00 $        0.00      n/a
-```
-
-That example carries a 3-cent gross cross. Fees take 1.74c of it. What is left is
-600 contracts and $7.51 on $582 of capital, and the other two candidate pairs are
-rejected outright — one for conflicting overtime rules, one for unverifiable
-settlement terms.
-
-`data/example/` is synthetic and hand-written to exercise all three gates. No
-number derived from it is a market observation.
+`data/example/` is synthetic, hand-built to exercise every gate. No number derived
+from it is a market observation.
 
 ## How it works
 
-Three gates, applied in order, before a pair contributes any measured capacity:
+Gates, in order, before a pair contributes any measured capacity:
 
-1. **Simultaneity** — captures more than 2s apart are excluded. Books read
-   seconds apart show edges that never simultaneously existed.
-2. **Settlement equivalence** — a pair counts only if every required resolution
-   term is present on both sides and agrees. Conflicts are `MISMATCHED`; missing
-   or unproven terms are `UNVERIFIED`. Both are excluded and both are reported.
-3. **Cost-adjusted depth** — both books are consumed level by level under an
-   explicit cost model, and slices are ranked by realized net edge.
+1. **Simultaneity** — captures >2s apart excluded.
+2. **Settlement equivalence** — canonical *coded* rule fields, never prose.
+   `MISMATCHED` is a positive claim of difference; `UNVERIFIED` means evidence is
+   missing and is not a soft match.
+3. **Exact locked profit** — `min(profit_if_yes, profit_if_no)` over integer
+   quantity pairs, full-depth VWAP, fees rounded once per order.
+4. **Shared capital** — simultaneous opportunities compete for one per-venue
+   budget; the same capital is never counted twice.
+5. **Episodes** — a continuously stale price is one opportunity, not one per poll.
 
-Everything rejected is counted, so "we verified this pair and found no edge" is
-never confused with "we could not verify anything".
+Everything rejected is counted, so "verified, no profit" is never confused with
+"could not verify".
 
 ## Layout
 
 ```
 src/emc/
-  models.py       value types; Decimal prices, book validation, crossed-book rejection
-  fees.py         venue cost models (placeholder rates — see docs/METHOD.md)
-  settlement.py   settlement-equivalence adjudication, deliberately pessimistic
-  depth.py        the measurement: capacity curve over book depth
+  models.py       Decimal prices, book validation, canonical settlement codes
+  fees.py         venue fee schedules with provenance and verification status
+  locked.py       exact locked profit over integer quantities and real depth
+  gates.py        revenue gates and the fee-floor screen
+  qlp.py          shared-capital allocation and episode collapsing
+  settlement.py   settlement-equivalence adjudication over coded fields
   probe.py        orchestration and reporting
   registry.py     human-verified settlement terms, provenance required
-  serde.py        exact-decimal snapshot serialization
+  serde.py        exact-decimal serialization, coded-field validation
   venues/         read-only adapters: kalshi, polymarket, offline fixtures
-  cli.py          `probe` and `capture`
-data/example/     synthetic snapshots and a placeholder settlement registry
-docs/METHOD.md    measurement definition, findings, and limitations
+  cli.py          screen / probe / capture
+MISSION.md        mission, hypotheses, gates, constraints
+STATUS.md         what is live, mocked, blocked; measured economics; next gate
+DECISIONS.md      dated decisions, measurements, killed hypotheses
 ```
 
-## Status
+## Status summary
 
-The measurement engine is complete and tested. The ingest layer is not verified
-against live endpoints.
+- **Working and tested:** locked-profit math, adjudication, fee models, capital
+  allocation, episodes, registry, CLI, serialization, scope guardrails.
+- **Blocked:** all three venue hosts are denied by the environment's egress policy.
+  No live payload has ever been fetched. Parsers are written to documented shapes
+  and tested against hand-written fixtures — self-consistent, not verified.
+- **Corroborated, not primary:** fee formulas agree across independent secondary
+  sources; both venues' primary docs returned HTTP 403. Kalshi's `M` multiplier for
+  MLB is unresolved.
 
-- **Working and tested:** capacity math, adjudication, cost models, registry, CLI,
-  serialization, scope guardrails. 196 tests, no network required.
-- **Unverified:** venue payload shapes. The development environment's network
-  policy denies outbound access to the Kalshi and Polymarket hosts, so no live
-  payload was ever fetched. Parsers were written against documented shapes and
-  tested against hand-written fixtures. Capture one real payload per endpoint and
-  reconcile before trusting live output.
-- **Placeholder:** fee rates. Non-zero by design so nothing runs at an implicit
-  zero cost, but not verified against any published schedule.
-
-Two findings are worth reading before using this: fees usually exceed the gross
-spread on near-coin-flip markets, and settlement terms are not published in
-machine-readable form by either venue — which caps a fully automated probe at
-producing *candidate* pairs rather than measured capacity. Both are documented
-with their consequences in [docs/METHOD.md](docs/METHOD.md).
+The rate limiter on any real measurement is not code. Neither venue publishes
+overtime, void, postponement, or listed-pitcher rules in machine-readable form, so
+an automated probe can only produce *candidate* pairs. Turning candidates into
+measured capacity requires a human to read both rulebooks and record coded fields
+with citations.

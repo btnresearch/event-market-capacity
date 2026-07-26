@@ -13,12 +13,25 @@ SRC = REPO_ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from emc.fees import BpsFee, FixedPerFillFee, KalshiStyleFee, VenueCosts, ZeroFee  # noqa: E402
-from emc.models import BookLevel, MarketSnapshot, OrderBook, SettlementTerms  # noqa: E402
+from emc.fees import Role, preset_costs  # noqa: E402
+from emc.models import (  # noqa: E402
+    BookLevel,
+    ExtraInnings,
+    ListedPitcherRule,
+    MarketSnapshot,
+    MarketType,
+    OrderBook,
+    PostponementTreatment,
+    SettlementTerms,
+    SuspendedTreatment,
+    TieTreatment,
+    VenueChangeTreatment,
+)
 
 DATA = Path(__file__).parent / "data"
 EXAMPLE = REPO_ROOT / "data" / "example"
 T0 = datetime(2026, 7, 26, 22, 0, tzinfo=timezone.utc)
+START = datetime(2026, 7, 27, 17, 5, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -40,20 +53,38 @@ def levels(*pairs: tuple[str, int]) -> tuple[BookLevel, ...]:
 
 
 def terms(**overrides) -> SettlementTerms:
-    """Fully-specified settlement terms, so a test can knock out exactly one field."""
-    base = {
-        "event_key": "nba-2026-07-27-lal-bos",
-        "league": "NBA",
-        "participants": frozenset({"Los Angeles Lakers", "Boston Celtics"}),
-        "scheduled_start_utc": datetime(2026, 7, 27, 23, 0, tzinfo=timezone.utc),
-        "market_type": "moneyline",
-        "outcome": "Los Angeles Lakers",
-        "settlement_source": "NBA official final score",
-        "includes_overtime": True,
-        "void_rule": "void if not completed within 7 days of scheduled start",
-    }
+    """Fully-specified canonical terms, so a test can knock out exactly one field."""
+    base = dict(
+        sport="baseball",
+        league="MLB",
+        home_team="Boston Red Sox",
+        away_team="New York Yankees",
+        game_date="2026-07-27",
+        doubleheader_number=0,
+        scheduled_start_utc=START,
+        market_type=MarketType.GAME_WINNER,
+        outcome_team="New York Yankees",
+        extra_innings=ExtraInnings.INCLUDED,
+        tie_treatment=TieTreatment.IMPOSSIBLE,
+        postponement=PostponementTreatment.VOID_IF_NOT_PLAYED_IN_WINDOW,
+        postponement_window_hours=168,
+        suspended=SuspendedTreatment.OFFICIAL_IF_REGULATION_COMPLETE,
+        listed_pitcher=ListedPitcherRule.NOT_REQUIRED,
+        venue_change=VenueChangeTreatment.NO_EFFECT,
+        settlement_source="MLB official final score",
+    )
     base.update(overrides)
     return SettlementTerms(**base)
+
+
+def other_game(**overrides) -> SettlementTerms:
+    """A different MLB game, for tests that need two independent events."""
+    return terms(
+        home_team="San Francisco Giants",
+        away_team="Los Angeles Dodgers",
+        outcome_team="Los Angeles Dodgers",
+        **overrides,
+    )
 
 
 def snapshot(
@@ -64,6 +95,7 @@ def snapshot(
     captured_at: datetime | None = None,
     settlement: SettlementTerms | None = None,
     market_id: str | None = None,
+    payout: Decimal = Decimal("1"),
 ) -> MarketSnapshot:
     return MarketSnapshot(
         venue=venue,
@@ -71,25 +103,26 @@ def snapshot(
         book=OrderBook(bids=bids, asks=asks),
         captured_at=captured_at or T0,
         settlement=settlement if settlement is not None else terms(),
+        payout_usd=payout,
     )
 
 
 @pytest.fixture
-def zero_costs() -> dict[str, VenueCosts]:
+def taker_costs():
     return {
-        "kalshi": VenueCosts(venue="kalshi", taker_fee=ZeroFee()),
-        "polymarket": VenueCosts(venue="polymarket", taker_fee=ZeroFee()),
+        "kalshi": preset_costs("kalshi", Role.TAKER),
+        "polymarket": preset_costs("polymarket", Role.TAKER),
     }
 
 
 @pytest.fixture
-def realistic_costs() -> dict[str, VenueCosts]:
-    """Mirrors emc.cli.build_default_costs so report assertions stay in one place."""
+def maker_costs():
     return {
-        "kalshi": VenueCosts(venue="kalshi", taker_fee=KalshiStyleFee(rate=Decimal("0.07"))),
-        "polymarket": VenueCosts(
-            venue="polymarket",
-            taker_fee=BpsFee(bps=Decimal("0")),
-            per_fill=FixedPerFillFee(usd=Decimal("0.05")),
-        ),
+        "kalshi": preset_costs("kalshi", Role.MAKER),
+        "polymarket": preset_costs("polymarket", Role.MAKER),
     }
+
+
+@pytest.fixture
+def ample_capital():
+    return {"kalshi": Decimal("1000000"), "polymarket": Decimal("1000000")}

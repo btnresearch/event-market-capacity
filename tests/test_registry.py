@@ -61,9 +61,9 @@ def test_apply_attaches_verified_terms():
         "polymarket",
         market_id="0xTOKEN",
         asks=levels(("0.54", 10)),
-        settlement=terms(void_rule=None),
+        settlement=terms(listed_pitcher=None),
     )
-    assert registry.apply(snap).settlement.void_rule == terms().void_rule
+    assert registry.apply(snap).settlement.listed_pitcher == terms().listed_pitcher
 
 
 def test_apply_replaces_rather_than_merges():
@@ -72,21 +72,13 @@ def test_apply_replaces_rather_than_merges():
     Merging would leave a record in which some fields are sourced and some are
     guessed, with no way to tell them apart.
     """
-    sparse = dict(VALID) | {
-        "terms": settlement_to_dict(
-            terms(
-                event_key=None,
-                includes_overtime=None,
-                scheduled_start_utc=datetime(2026, 7, 27, 23, 0, tzinfo=timezone.utc),
-            )
-        )
-    }
+    sparse = dict(VALID) | {"terms": settlement_to_dict(terms(extra_innings=None))}
     registry = SettlementRegistry.from_dicts([sparse])
     snap = snapshot("polymarket", market_id="0xTOKEN", asks=levels(("0.54", 10)))
     applied = registry.apply(snap)
 
-    assert snap.settlement.includes_overtime is True
-    assert applied.settlement.includes_overtime is None
+    assert snap.settlement.extra_innings is not None
+    assert applied.settlement.extra_innings is None
 
 
 def test_apply_leaves_unlisted_snapshots_untouched():
@@ -116,7 +108,7 @@ def test_load_accepts_wrapped_and_bare_forms(tmp_path):
 
 def test_committed_example_registry_is_valid(example_dir):
     registry = SettlementRegistry.load(example_dir / "settlement.json")
-    entry = registry.entry_for("polymarket", "0xNYYBOS-NYY-YES")
+    entry = registry.entry_for("polymarket", "0xHOU-YES")
     assert entry is not None
     assert entry.source_url
     assert entry.verified_on

@@ -209,7 +209,10 @@ def test_parsers_leave_settlement_terms_empty_when_none_are_supplied():
     matched without human verification.
     """
     snap = parse_orderbook({"orderbook": {"yes": [[50, 1]], "no": []}}, "X", T0)
-    assert snap.settlement.void_rule is None
-    assert snap.settlement.includes_overtime is None
+    assert snap.settlement.extra_innings is None
+    assert snap.settlement.listed_pitcher is None
+    assert snap.settlement.postponement is None
+    assert snap.settlement.suspended is None
+    assert snap.settlement.doubleheader_number is None
     assert snap.settlement.settlement_source is None
     assert snap.settlement.participants == frozenset()

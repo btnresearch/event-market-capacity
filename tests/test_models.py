@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 from conftest import levels, snapshot
 
-from emc.models import BookLevel, CapacityPoint, CrossedBookError, OrderBook, price
+from emc.models import BookLevel, CrossedBookError, OrderBook, price
 
 
 def test_price_converts_float_without_binary_drift():
@@ -68,14 +68,6 @@ def test_naive_capture_time_is_rejected():
         snapshot("kalshi", captured_at=datetime(2026, 7, 26, 22, 0))
 
 
-def test_return_on_capital_is_none_when_no_capital_deployed():
-    point = CapacityPoint(Decimal("0"), 0, Decimal("0"), Decimal("0"), None)
-    assert point.return_on_capital is None
-
-
-def test_return_on_capital_divides_profit_by_capital():
-    point = CapacityPoint(Decimal("0"), 100, Decimal("95"), Decimal("5"), Decimal("0.05"))
-    assert point.return_on_capital == Decimal("5") / Decimal("95")
 
 
 def test_snapshot_ref_carries_venue_and_id():
@@ -92,3 +84,25 @@ def test_scheduled_start_must_be_timezone_aware():
 
     aware = SettlementTerms(scheduled_start_utc=datetime(2026, 7, 27, 23, 0, tzinfo=timezone.utc))
     assert aware.scheduled_start_utc is not None
+
+
+def test_settlement_deadline_must_be_timezone_aware():
+    from emc.models import SettlementTerms
+
+    with pytest.raises(ValueError, match="timezone-aware"):
+        SettlementTerms(settlement_deadline_utc=datetime(2026, 7, 28, 3, 0))
+
+
+def test_participants_are_derived_from_home_and_away():
+    from emc.models import SettlementTerms
+
+    terms = SettlementTerms(home_team="Boston Red Sox", away_team="New York Yankees")
+    assert terms.participants == frozenset({"Boston Red Sox", "New York Yankees"})
+    assert SettlementTerms().participants == frozenset()
+
+
+def test_doubleheader_number_must_be_non_negative():
+    from emc.models import SettlementTerms
+
+    with pytest.raises(ValueError, match="doubleheader_number"):
+        SettlementTerms(doubleheader_number=-1)
