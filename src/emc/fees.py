@@ -54,8 +54,9 @@ from enum import Enum
 __all__ = [
     "KALSHI_MAKER",
     "KALSHI_TAKER",
-    "POLYMARKET_SPORTS_MAKER",
-    "POLYMARKET_SPORTS_TAKER",
+    "POLYMARKET_INTL_SPORTS_TAKER",
+    "POLYMARKET_US_MAKER",
+    "POLYMARKET_US_TAKER",
     "Fill",
     "FeeSchedule",
     "QuadraticFee",
@@ -192,22 +193,55 @@ KALSHI_MAKER = QuadraticFee(
     verified=Verification.CORROBORATED,
 )
 
-# Polymarket sports: C * 0.05 * p * (1-p), rate raised 0.03 -> 0.05 in July 2026.
-# Max taker cost $1.25 per 100 shares = 1.25c/contract at p=0.50. Makers pay 0.
-_PM_SRC = (
-    "Polymarket sports taker fee C*0.05*p*(1-p) (rate raised from 0.03 to 0.05 in July 2026; "
-    "max $1.25/100 shares at p=0.50). Makers pay no fee. Corroborated across independent "
-    "secondary sources; primary docs returned HTTP 403. No published rounding rule."
+# Polymarket taker: C * theta * p * (1-p). TWO DISTINCT THETAS EXIST and conflating
+# them understates the fee floor:
+#
+#   theta = 0.06  Polymarket US, applied UNIFORMLY across market categories.
+#                 Max taker cost $1.50 per 100 shares at p=0.50. THIS IS THE ONE
+#                 THIS REPOSITORY USES: the US venue is the one a US operator can
+#                 legally reach, so it is the only rate that bounds a real position.
+#   theta = 0.05  polymarket.com international, sports categories only.
+#                 Max taker cost $1.25 per 100 shares at p=0.50. Recorded for
+#                 provenance and explicitly NOT used.
+#
+# Correcting 0.05 -> 0.06 raises the taker-leg cost and therefore STRENGTHENS every
+# kill in DECISIONS.md. It cannot rescue a route; it can only make one deader.
+_PM_SRC_BASE = (
+    "Polymarket taker fee C*theta*p*(1-p). Corroborated across independent secondary "
+    "sources; primary docs returned HTTP 403. No published rounding rule."
+)
+_PM_US_SRC = (
+    _PM_SRC_BASE + " theta=0.06 uniform across categories on Polymarket US; "
+    "max $1.50/100 shares at p=0.50."
+)
+_PM_INTL_SRC = (
+    _PM_SRC_BASE + " theta=0.05 on polymarket.com international SPORTS categories only "
+    "(raised from 0.03 in July 2026); max $1.25/100 shares at p=0.50. "
+    "NOT the US rate. Recorded for provenance; not used in any gate."
 )
 
-POLYMARKET_SPORTS_TAKER = QuadraticFee(
-    rate=Decimal("0.05"),
+POLYMARKET_US_TAKER = QuadraticFee(
+    rate=Decimal("0.06"),
     round_up_to_cent=False,
-    source=_PM_SRC,
+    source=_PM_US_SRC,
     verified=Verification.CORROBORATED,
 )
-POLYMARKET_SPORTS_MAKER = ZeroFee(
-    source=_PM_SRC + " Rebate pool deliberately NOT modelled as a cost offset.",
+
+# Provenance only. Deliberately not wired into POLYMARKET_SCHEDULE.
+POLYMARKET_INTL_SPORTS_TAKER = QuadraticFee(
+    rate=Decimal("0.05"),
+    round_up_to_cent=False,
+    source=_PM_INTL_SRC,
+    verified=Verification.CORROBORATED,
+)
+
+# Maker stays zero on both. The US theta correction is a TAKER-side correction; no
+# source reviewed puts a maker fee on either venue's book, and inventing one would
+# be the kind of unsourced constant this module exists to prevent. If a maker fee
+# is ever established, maker/maker is the route it would kill.
+POLYMARKET_US_MAKER = ZeroFee(
+    source=_PM_US_SRC + " Makers pay no fee. Rebate pool deliberately NOT modelled "
+    "as a cost offset.",
     verified=Verification.CORROBORATED,
 )
 
@@ -249,7 +283,7 @@ class VenueCosts:
 
 KALSHI_SCHEDULE = FeeSchedule(venue="kalshi", taker=KALSHI_TAKER, maker=KALSHI_MAKER)
 POLYMARKET_SCHEDULE = FeeSchedule(
-    venue="polymarket", taker=POLYMARKET_SPORTS_TAKER, maker=POLYMARKET_SPORTS_MAKER
+    venue="polymarket", taker=POLYMARKET_US_TAKER, maker=POLYMARKET_US_MAKER
 )
 
 _SCHEDULES = {"kalshi": KALSHI_SCHEDULE, "polymarket": POLYMARKET_SCHEDULE}

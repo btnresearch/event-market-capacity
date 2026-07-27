@@ -4,6 +4,77 @@ Dated records of decisions, measurements, and killed hypotheses. Newest first.
 
 ---
 
+## 2026-07-27 — Polymarket rate corrected to the US theta, and all four role combinations killed or bounded
+
+**Correction first.** Polymarket was modelled at `theta = 0.05`. That is the
+**polymarket.com international SPORTS** rate. **Polymarket US charges `theta = 0.06`
+uniformly across categories.** The US venue is the one a US operator can legally
+reach, so 0.06 is the only rate that bounds a real position. Both are now recorded
+in `emc/fees.py`; only the US rate is wired into `POLYMARKET_SCHEDULE`.
+
+The correction raises every taker-leg cost. **It strengthens the kill and cannot
+rescue any route.** Taker/taker at a coin flip moves 3.000c → **3.250c**. Kalshi is
+unchanged at 0.07 taker / 0.0175 maker, and both venues' maker legs are unchanged,
+so maker/maker is the one combination the correction does not touch.
+
+**Fee floor, per contract, by role (Kalshi role / Polymarket role).**
+
+| P | taker/taker | maker/taker | taker/maker | maker/maker |
+|---|---|---|---|---|
+| 0.40 | 3.1200c | 1.8600c | 1.6800c | 0.4200c |
+| 0.45 | 3.2175c | 1.9181c | 1.7325c | 0.4331c |
+| **0.50** | **3.2500c** | **1.9375c** | **1.7500c** | **0.4375c** |
+| 0.55 | 3.2175c | 1.9181c | 1.7325c | 0.4331c |
+| 0.60 | 3.1200c | 1.8600c | 1.6800c | 0.4200c |
+
+Strict ordering, no ties: taker/taker > maker/taker > taker/maker > maker/maker.
+
+**Which routes are dead, and the gross cross each would need to survive.**
+
+| Route | Needs a gross cross above | Verdict at P=0.50 |
+|---|---|---|
+| taker/taker | **3.2500c** | **DEAD.** Infeasible at 0.5c, 1c and 2c. |
+| maker/taker | **1.9375c** | **DEAD.** Infeasible at 0.5c and 1c. |
+| taker/maker | **1.7500c** | **DEAD.** Infeasible at 0.5c and 1c. |
+| maker/maker | **0.4375c** | Clears every cross tested, including 0.5c. **Not arbitrage — see below.** |
+
+"Dead" means dead as a route to the revenue targets at any plausible spread, not
+that the arithmetic is undefined. Where a route does clear, the depth is the kill:
+
+| Route | Cross | $250k → contracts / capital per slate | $1M → contracts / capital per slate |
+|---|---|---|---|
+| taker/taker | 4c | 185,186 / $177,778.56 | 740,742 / $711,112.32 |
+| maker/taker | 2c | 2,222,224 / $2,177,779.52 | 8,888,896 / $8,711,118.08 |
+| maker/taker | 4c | 67,341 / $64,647.36 | 269,361 / $258,586.56 |
+| taker/maker | 2c | 555,556 / $544,444.88 | 2,222,224 / $2,177,779.52 |
+| taker/maker | 4c | 61,729 / $59,259.84 | 246,914 / $237,037.44 |
+| maker/maker | 0.5c | 2,222,224 / $2,211,112.88 | 8,888,896 / $8,844,451.52 |
+| maker/maker | 1c | 246,914 / $244,444.86 | 987,656 / $977,779.44 |
+| maker/maker | 2c | 88,889 / $87,111.22 | 355,556 / $348,444.88 |
+| maker/maker | 4c | 38,987 / $37,427.52 | 155,946 / $149,708.16 |
+
+$500k rows omitted here for width; all three targets are in
+`tests/test_gates.py::REQUIREMENTS_AT_HALF`. Targets are $1,388.89 / $2,777.78 /
+$5,555.56 per slate over 180 slates.
+
+**maker/maker is not arbitrage.** It has the lowest floor of the four and that is
+precisely why it is not a locked position. Both legs are resting orders. **Neither
+leg is guaranteed to fill.** A one-sided fill is not a cheap arbitrage, it is a
+naked directional position in an event contract, and the cheap fee floor buys an
+unhedged inventory problem rather than free money. Nothing in `emc.locked` or
+`emc.qlp` models fill probability, so **no number in this repository may be read as
+a maker/maker expectation.** Its floor bounds a cost, not a return.
+
+**Consequence for the ranking.** Three of four combinations are dead on fees alone.
+The survivor is not an arbitrage route, so Hypothesis A is now dead at **every**
+role combination, not only at taker/taker. What survives is Hypothesis B, and it
+survives as an unevaluated market-making question, not as a discounted version of A.
+
+**Encoded at** `emc/fees.py`, `emc/gates.py`, `tests/test_gates.py` (the four-role
+kill block: 63 new tests, literal expected values), `python -m emc.cli screen`.
+
+---
+
 ## 2026-07-26 — Hypothesis A killed as a $250k route at taker/taker
 
 **Measurement.** Both venues charge a fee of the form
@@ -12,10 +83,14 @@ two-leg taker cost:
 
 | Price | Kalshi | Polymarket | Combined = required gross spread |
 |---|---|---|---|
-| 0.40 | 1.680c | 1.200c | **2.880c** |
-| 0.45 | 1.732c | 1.238c | **2.970c** |
-| 0.50 | 1.750c | 1.250c | **3.000c** |
-| 0.60 | 1.680c | 1.200c | **2.880c** |
+| 0.40 | 1.680c | 1.440c | **3.120c** |
+| 0.45 | 1.732c | 1.485c | **3.218c** |
+| 0.50 | 1.750c | 1.500c | **3.250c** |
+| 0.60 | 1.680c | 1.440c | **3.120c** |
+
+> **SUPERSEDED 2026-07-27.** Figures above are restated at the corrected Polymarket
+> US theta of 0.06. As originally written they used 0.05 and read 2.880c / 2.970c /
+> 3.000c / 2.880c. The correction raises the floor; the kill stands and is harder.
 
 Competitive MLB game-winner markets trade in the 0.35–0.65 band, i.e. exactly where
 the fee is worst.
@@ -25,9 +100,12 @@ two liquid venues on the same game — the requirement is:
 
 | Target | Net edge | Contracts/slate | Capital/slate |
 |---|---|---|---|
-| $250k | 1.00c | 138,889 | ~$133,333 |
-| $500k | 1.00c | 277,800 | ~$266,688 |
-| $1M | 1.00c | 555,556 | ~$533,376 |
+| $250k | 0.75c | 185,186 | ~$177,779 |
+| $500k | 0.75c | 370,371 | ~$355,556 |
+| $1M | 0.75c | 740,742 | ~$711,112 |
+
+> **SUPERSEDED 2026-07-27.** Restated at theta 0.06. Originally 1.00c net and
+> 138,889 / 277,800 / 555,556 contracts.
 
 **Decision.** Taker/taker settlement-matched cross-venue arbitrage is dead as a
 route to $250k/yr on MLB. The required matched depth is orders of magnitude beyond
@@ -53,13 +131,17 @@ $250k scale* is settled.
 
 | Roles | Required gross spread |
 |---|---|
-| taker / taker | 3.000c |
+| taker / taker | 3.250c |
+| maker / taker | 1.938c |
 | taker / maker | 1.750c |
-| maker / taker | 1.688c |
 | maker / maker | 0.438c |
 
-Maker/maker is ~6.9× cheaper, because Kalshi's maker rate is 25% of taker and
+Maker/maker is ~7.4× cheaper, because Kalshi's maker rate is 25% of taker and
 Polymarket makers pay nothing.
+
+> **SUPERSEDED 2026-07-27.** Restated at theta 0.06; the ratio was ~6.9× at 0.05.
+> Note maker/taker and taker/maker swap order under the correction: a Polymarket
+> taker leg is now more expensive than a Kalshi taker leg's maker counterpart.
 
 **Decision.** The only execution style that clears a plausible spread is resting
 liquidity. But two resting maker orders cannot both be guaranteed to fill, and one

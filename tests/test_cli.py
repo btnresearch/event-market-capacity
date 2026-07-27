@@ -19,13 +19,13 @@ def test_screen_runs_without_any_data(capsys):
     assert main(["screen"]) == 0
     out = capsys.readouterr().out
     assert "FEE FLOOR" in out
-    assert "3.000c" in out  # taker/taker at P=0.50
+    assert "3.250c" in out  # taker/taker at P=0.50, Polymarket US theta 0.06
 
 
 def test_screen_reports_the_revenue_gates_as_contract_counts(capsys):
     main(["screen"])
     out = capsys.readouterr().out
-    assert "138,889" in out
+    assert "185,186" in out
     assert "$250k/yr" in out and "$1M/yr" in out
 
 

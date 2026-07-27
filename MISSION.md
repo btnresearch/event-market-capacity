@@ -62,12 +62,15 @@ Both venues charge `rate × contracts × price × (1 − price)`. That peaks at 
 which is exactly where competitive MLB game-winner markets sit. Minimum gross
 cross-venue spread that can break even, per contract:
 
-| Roles | Floor at P=0.50 |
+| Roles (Kalshi / Polymarket) | Floor at P=0.50 |
 |---|---|
-| taker / taker | **3.000c** |
+| taker / taker | **3.250c** |
+| maker / taker | 1.938c |
 | taker / maker | 1.750c |
-| maker / taker | 1.688c |
 | maker / maker | 0.438c |
+
+Polymarket taker is the US uniform theta 0.06. The international sports rate of 0.05
+is recorded in `emc/fees.py` but not used.
 
 Run `python -m emc.cli screen` to reproduce. This floor depends on nothing but the
 two fee schedules — not depth, latency, or execution skill.

@@ -89,7 +89,7 @@ def test_an_eight_cent_cross_clears_the_fee_floor(taker_costs, ample_capital):
 
     assert report.counts[PairStatus.LOCKED_PROFIT.value] == 1
     quote = of(report, PairStatus.LOCKED_PROFIT)[0].quote
-    assert quote.locked_profit_usd == Decimal("42.40")
+    assert quote.locked_profit_usd == Decimal("40.72")
 
 
 def test_maker_role_changes_the_verdict_on_the_same_books(
@@ -174,7 +174,7 @@ def test_simultaneous_pairs_do_not_double_count_venue_capital(taker_costs):
     report = run_probe(snaps, taker_costs, budget)
 
     assert report.candidates_considered == 2
-    assert report.uncapped_locked_profit_usd == Decimal("84.80")
+    assert report.uncapped_locked_profit_usd == Decimal("81.44")
     assert report.capital_constrained_locked_profit_usd < report.uncapped_locked_profit_usd
     assert report.allocation.capital_used["kalshi"] <= Decimal("500")
     assert report.allocation.capital_used["polymarket"] <= Decimal("500")
@@ -186,8 +186,8 @@ def test_report_distinguishes_uncapped_from_capital_constrained(taker_costs):
         snapshot("polymarket", bids=levels(("0.70", 800))),
     ]
     tiny = run_probe(snaps, taker_costs, {"kalshi": Decimal("62"), "polymarket": Decimal("30")})
-    assert tiny.uncapped_locked_profit_usd == Decimal("42.40")
-    assert tiny.capital_constrained_locked_profit_usd < Decimal("42.40")
+    assert tiny.uncapped_locked_profit_usd == Decimal("40.72")
+    assert tiny.capital_constrained_locked_profit_usd < Decimal("40.72")
 
 
 def test_missing_cost_model_is_an_error_not_an_implicit_zero(ample_capital):

@@ -11,18 +11,23 @@ measurement over synthetic fixtures.
 The one economically decisive number established this session:
 
 > A two-leg settlement-matched taker/taker locked position on Kalshi + Polymarket
-> costs **2.88c–3.00c per contract in fees** across the 0.40–0.60 price band where
+> costs **3.12c–3.25c per contract in fees** across the 0.40–0.60 price band where
 > competitive MLB game-winner markets trade.
 
-At an already-extreme 4c persistent gross cross, $250k/yr needs **138,889
-contracts and ~$133,000 of capital per slate**. That is orders of magnitude above
-what MLB game-winner books quote. Hypothesis A is killed at taker/taker without
-needing any live data — see DECISIONS.md.
+Restated 2026-07-27 from 2.88c–3.00c after correcting Polymarket to the US uniform
+theta of 0.06 (0.05 is the international sports rate). All four role combinations
+are now bounded and tested; three are dead on fees alone. See DECISIONS.md
+2026-07-27.
+
+At an already-extreme 4c persistent gross cross, $250k/yr needs **185,186
+contracts and ~$177,779 of capital per slate**. That is orders of magnitude above
+what MLB game-winner books quote. Hypothesis A is killed at **every** role
+combination without needing any live data — see DECISIONS.md.
 
 ## Tests
 
 ```
-264 passed in 7.54s
+327 passed in 7.67s
 ```
 
 `python -m pytest`. No network required. Coverage by area:
@@ -31,7 +36,7 @@ needing any live data — see DECISIONS.md.
 |---|---|---|
 | Fee formulas, rounding, maker/taker, provenance | `test_fees.py` | 8 |
 | Locked profit, depth, integer optimization, caps | `test_locked.py` | 25 |
-| Revenue gates and the fee floor | `test_gates.py` | 21 |
+| Revenue gates and the fee floor, all four role combinations | `test_gates.py` | 84 |
 | Shared capital, episode collapsing | `test_qlp.py` | 16 |
 | Settlement adjudication over coded fields | `test_settlement.py` | 30 |
 | Probe orchestration end to end | `test_probe.py` | 22 |
@@ -77,7 +82,8 @@ Backwards either way invents a large fake spread.
 |---|---|---|
 | Kalshi taker | `roundup(M × 0.07 × C × P × (1−P))`, max 1.75c/contract | **CORROBORATED** — multiple independent secondary sources agree on formula and constant. Primary PDF returned HTTP 403. |
 | Kalshi maker | 25% of taker → max 0.4375c/contract | **CORROBORATED**. Whether the discount applies before or after the cent round-up is **UNRESOLVED**; code applies it before. |
-| Polymarket sports taker | `C × 0.05 × p × (1−p)`, max $1.25/100 shares | **CORROBORATED**. Rate raised 0.03 → 0.05 in July 2026. |
+| Polymarket US taker | `C × 0.06 × p × (1−p)`, max $1.50/100 shares | **CORROBORATED**. Uniform theta across categories. **This is the rate used.** |
+| Polymarket international sports taker | `C × 0.05 × p × (1−p)`, max $1.25/100 shares | **CORROBORATED**. Recorded for provenance only; NOT used. Raised 0.03 → 0.05 in July 2026. |
 | Polymarket sports maker | no fee | **CORROBORATED**. Rebate pool deliberately NOT modelled as a cost offset. |
 
 Unresolved: Kalshi's `M` multiplier for MLB series (code assumes 1, and is wrong if
@@ -105,15 +111,40 @@ route survives.
 
 ## Next binary gate
 
-**Does any Kalshi ↔ Polymarket MLB game-winner pair ever quote a gross cross-venue
-spread above 3.00c, simultaneously, at depth, with provably identical settlement?**
+**This gate changed on 2026-07-27 and is no longer a question about a spread.**
 
-Yes → measure QLP at 0, 5, 30, 90s and test against $1,389/slate.
-No → Hypothesis A is dead outright, not just at $250k, and the work moves to
-Hypothesis B where the binding question is inventory risk rather than locked profit.
+The old gate was *"does any pair ever quote a gross cross above 3.00c?"* That gate
+assumed taker/taker was the route worth measuring. The four-role extension killed
+taker/taker (needs >3.2500c), maker/taker (>1.9375c) and taker/maker (>1.7500c) on
+fees alone. The only combination that clears a plausible cross is maker/maker at
+0.4375c — **and maker/maker is not arbitrage, because neither resting leg is
+guaranteed to fill.** A spread question cannot settle a fill question, so measuring
+crosses would no longer decide anything.
 
-The fee floor makes the expected answer "no". The gate exists to falsify that
-expectation with data rather than assume it.
+The gate is therefore:
+
+> **When a resting two-sided quote is posted on both venues on the same
+> settlement-matched MLB game-winner market, does the joint two-sided fill arrive
+> often enough, and does the one-sided fill cost little enough to unwind, that
+> expected net per contract stays positive after the 0.4375c maker/maker floor and
+> after the cost of flattening unmatched inventory?**
+
+Yes → Hypothesis B has an economic basis and QLP gets replaced by an
+inventory-aware measure, because quoted locked profit is the wrong instrument for a
+position that is not locked.
+No → Hypothesis B dies on the same fee-and-fill arithmetic that killed A, and the
+work moves to Hypothesis C, where the asset is the dataset rather than the trade.
+
+**This gate needs different data than the old one.** Book snapshots alone cannot
+answer it. It requires fill and print data, the queue position of a resting order,
+and the realized cost of unwinding a one-sided fill. None of that is collected, and
+none of it is modelled anywhere in this repository — `emc.locked` and `emc.qlp`
+contain no fill-probability parameter by design.
+
+**What must NOT happen next.** Building a market-making simulator to answer this
+from assumptions. A simulator would produce a fill rate chosen by whoever wrote it,
+and that number would then propagate into a revenue forecast. The fill rate has to
+be measured or the gate stays open.
 
 ## Blocking the gate
 

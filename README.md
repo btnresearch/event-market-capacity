@@ -14,16 +14,20 @@ quoted, net of exact fees, across real depth, within a shared capital budget?
 $ python -m emc.cli screen
 
     price  taker/taker  taker/maker  maker/taker  maker/maker
-     0.40      2.880c      1.680c      1.620c      0.420c
-     0.50      3.000c      1.750c      1.688c      0.438c
-     0.60      2.880c      1.680c      1.620c      0.420c
+     0.40      3.120c      1.680c      1.860c      0.420c
+     0.50      3.250c      1.750c      1.938c      0.438c
+     0.60      3.120c      1.680c      1.860c      0.420c
 ```
 
 Both venues charge `rate × contracts × price × (1 − price)`, which peaks at 0.50 —
 exactly where competitive MLB game-winner markets trade. A two-leg taker/taker
-locked position therefore needs a **3-cent** gross cross-venue spread just to break
-even. At an extreme 4c cross, $250k/yr requires 138,889 contracts and ~$133,000 of
-capital *per slate*.
+locked position therefore needs a **3.25-cent** gross cross-venue spread just to
+break even. At an extreme 4c cross, $250k/yr requires 185,186 contracts and
+~$177,779 of capital *per slate*.
+
+All four role combinations are bounded and tested. Three are dead on fees alone;
+the fourth, maker/maker, is not arbitrage because neither resting leg is guaranteed
+to fill. See [DECISIONS.md](DECISIONS.md) 2026-07-27.
 
 That kills settlement-matched cross-venue arbitrage as a $250k route, from the fee
 schedules alone, with no live data. Details in [DECISIONS.md](DECISIONS.md).

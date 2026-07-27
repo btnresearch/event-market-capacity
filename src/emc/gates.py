@@ -13,10 +13,15 @@ possibly break even is:
 
     required_gross = kalshi_rate_eff * P*(1-P) + polymarket_rate_eff * P*(1-P)
 
-At P = 0.50 with both legs taker that is 3.00c per contract. MLB game-winner
-markets for competitive games sit near 0.50, which is exactly where the fee is
-worst. This is a hard floor: it does not depend on depth, latency, or execution
-skill, and no amount of engineering moves it.
+At P = 0.50 with both legs taker that is 3.25c per contract, using Polymarket's US
+uniform theta of 0.06. MLB game-winner markets for competitive games sit near 0.50,
+which is exactly where the fee is worst. This is a hard floor: it does not depend on
+depth, latency, or execution skill, and no amount of engineering moves it.
+
+All four role combinations are pinned in ``tests/test_gates.py``: taker/taker
+3.2500c, maker/taker 1.9375c, taker/maker 1.7500c, maker/maker 0.4375c. The first
+three are dead on fees alone. maker/maker clears, but it is not arbitrage: both legs
+rest, neither is guaranteed to fill, and nothing here models fill probability.
 
 Screening on this before collecting data is the cheapest possible falsification,
 which is why it is a first-class function rather than a comment.

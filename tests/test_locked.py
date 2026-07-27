@@ -15,7 +15,7 @@ from conftest import levels
 from emc.fees import (
     Fill,
     KALSHI_TAKER,
-    POLYMARKET_SPORTS_TAKER,
+    POLYMARKET_US_TAKER,
     Role,
     VenueCosts,
     ZeroFee,
@@ -170,10 +170,10 @@ def test_eight_cent_cross_clears_the_taker_fee_floor():
     assert best.q_yes == best.q_no == 800
     # gross 0.08*800 = 64.00
     # kalshi  ceil(0.07*800*0.62*0.38) = ceil(13.1936) = 13.20
-    # poly     0.05*800*0.30*0.70      = 8.40  (no rounding)
+    # poly     0.06*800*0.30*0.70      = 10.08 (no rounding)
     assert best.yes_fee_usd == Decimal("13.20")
-    assert best.no_fee_usd == Decimal("8.40")
-    assert best.locked_profit_usd == Decimal("64.00") - Decimal("13.20") - Decimal("8.40")
+    assert best.no_fee_usd == Decimal("10.08")
+    assert best.locked_profit_usd == Decimal("64.00") - Decimal("13.20") - Decimal("10.08")
 
 
 def test_maker_fees_change_the_answer_on_the_same_book():
