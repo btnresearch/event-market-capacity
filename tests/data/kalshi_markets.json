@@ -1,0 +1,24 @@
+{
+  "_comment": "Hand-written to the DOCUMENTED shape of GET /trade-api/v2/markets. Not a captured response.",
+  "cursor": "",
+  "markets": [
+    {
+      "ticker": "NBA-LALBOS-LAL",
+      "event_ticker": "NBA-LALBOS",
+      "title": "Lakers to beat Celtics",
+      "status": "active",
+      "yes_bid": 52,
+      "yes_ask": 54,
+      "close_time": "2026-07-28T03:00:00Z"
+    },
+    {
+      "ticker": "MLB-NYYBOS-NYY",
+      "event_ticker": "MLB-NYYBOS",
+      "title": "Yankees to beat Red Sox",
+      "status": "active",
+      "yes_bid": 60,
+      "yes_ask": 62,
+      "close_time": "2026-07-27T21:00:00Z"
+    }
+  ]
+}

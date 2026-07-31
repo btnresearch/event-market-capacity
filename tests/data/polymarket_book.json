@@ -1,0 +1,13 @@
+{
+  "_comment": "Hand-written to the DOCUMENTED shape of GET /book?token_id=... on the Polymarket CLOB. Not a captured response. Prices are decimal strings already in probability units. Sizes may be fractional and are floored to whole contracts. Levels are deliberately unsorted.",
+  "market": "0xMARKETHASH",
+  "asset_id": "0xTOKENID",
+  "bids": [
+    {"price": "0.51", "size": "100"},
+    {"price": "0.52", "size": "250.5"}
+  ],
+  "asks": [
+    {"price": "0.55", "size": "300"},
+    {"price": "0.54", "size": "120"}
+  ]
+}

@@ -1,0 +1,412 @@
+{
+  "_comment": [
+    "SYNTHETIC. Hand-built to exercise every gate. Captured from no venue; cite nothing here.",
+    "A Yankees   8c gross cross -> clears the ~2.70c two-leg taker fee floor -> locked profit",
+    "B Dodgers   2c gross cross -> BELOW the fee floor -> matched but no locked profit",
+    "C Cubs     13c apparent    -> suppressed: extra_innings included vs regulation_only",
+    "D Astros    8c apparent    -> suppressed: listed_pitcher unpublished on one venue",
+    "E Mets     15c apparent    -> suppressed: doubleheader game 1 vs game 2 is not one event"
+  ],
+  "snapshots": [
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-NYYBOS-NYY",
+      "title": "Yankees to beat Red Sox",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.60",
+            500
+          ]
+        ],
+        "asks": [
+          [
+            "0.62",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "Boston Red Sox",
+        "away_team": "New York Yankees",
+        "outcome_team": "New York Yankees",
+        "scheduled_start_utc": "2026-07-27T17:05:00+00:00"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xNYY-YES",
+      "title": "Will the Yankees beat the Red Sox?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.70",
+            800
+          ]
+        ],
+        "asks": [
+          [
+            "0.72",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "Boston Red Sox",
+        "away_team": "New York Yankees",
+        "outcome_team": "New York Yankees",
+        "scheduled_start_utc": "2026-07-27T17:05:00+00:00"
+      }
+    },
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-LADSF-LAD",
+      "title": "Dodgers to beat Giants",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.52",
+            500
+          ]
+        ],
+        "asks": [
+          [
+            "0.54",
+            800
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "San Francisco Giants",
+        "away_team": "Los Angeles Dodgers",
+        "outcome_team": "Los Angeles Dodgers",
+        "scheduled_start_utc": "2026-07-27T20:10:00+00:00"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xLAD-YES",
+      "title": "Will the Dodgers beat the Giants?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.56",
+            600
+          ]
+        ],
+        "asks": [
+          [
+            "0.58",
+            900
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "San Francisco Giants",
+        "away_team": "Los Angeles Dodgers",
+        "outcome_team": "Los Angeles Dodgers",
+        "scheduled_start_utc": "2026-07-27T20:10:00+00:00"
+      }
+    },
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-CHCSTL-CHC",
+      "title": "Cubs to beat Cardinals",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.30",
+            500
+          ]
+        ],
+        "asks": [
+          [
+            "0.32",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "St. Louis Cardinals",
+        "away_team": "Chicago Cubs",
+        "outcome_team": "Chicago Cubs",
+        "scheduled_start_utc": "2026-07-27T18:15:00+00:00"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xCHC-YES",
+      "title": "Cubs to beat Cardinals in regulation",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.45",
+            1000
+          ]
+        ],
+        "asks": [
+          [
+            "0.47",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "regulation_only",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "St. Louis Cardinals",
+        "away_team": "Chicago Cubs",
+        "outcome_team": "Chicago Cubs",
+        "scheduled_start_utc": "2026-07-27T18:15:00+00:00"
+      }
+    },
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-HOUTEX-HOU",
+      "title": "Astros to beat Rangers",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.60",
+            500
+          ]
+        ],
+        "asks": [
+          [
+            "0.62",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "Texas Rangers",
+        "away_team": "Houston Astros",
+        "outcome_team": "Houston Astros",
+        "scheduled_start_utc": "2026-07-27T19:35:00+00:00"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xHOU-YES",
+      "title": "Will the Astros beat the Rangers?",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.70",
+            800
+          ]
+        ],
+        "asks": [
+          [
+            "0.72",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": null,
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 0,
+        "home_team": "Texas Rangers",
+        "away_team": "Houston Astros",
+        "outcome_team": "Houston Astros",
+        "scheduled_start_utc": "2026-07-27T19:35:00+00:00"
+      }
+    },
+    {
+      "venue": "kalshi",
+      "market_id": "MLB-NYMPHI-NYM-G1",
+      "title": "Mets to beat Phillies (G1)",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.40",
+            500
+          ]
+        ],
+        "asks": [
+          [
+            "0.42",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 1,
+        "home_team": "Philadelphia Phillies",
+        "away_team": "New York Mets",
+        "outcome_team": "New York Mets",
+        "scheduled_start_utc": "2026-07-27T16:05:00+00:00"
+      }
+    },
+    {
+      "venue": "polymarket",
+      "market_id": "0xNYM-G2-YES",
+      "title": "Mets to beat Phillies (G2)",
+      "captured_at": "2026-07-26T22:00:00+00:00",
+      "payout_usd": "1",
+      "book": {
+        "bids": [
+          [
+            "0.55",
+            1000
+          ]
+        ],
+        "asks": [
+          [
+            "0.57",
+            1000
+          ]
+        ]
+      },
+      "settlement": {
+        "sport": "baseball",
+        "league": "MLB",
+        "market_type": "game_winner",
+        "extra_innings": "included",
+        "tie_treatment": "impossible",
+        "postponement": "void_if_not_played_in_window",
+        "postponement_window_hours": 168,
+        "suspended": "official_if_regulation_complete",
+        "listed_pitcher": "not_required",
+        "venue_change": "no_effect",
+        "settlement_source": "MLB official final score",
+        "game_date": "2026-07-27",
+        "doubleheader_number": 2,
+        "home_team": "Philadelphia Phillies",
+        "away_team": "New York Mets",
+        "outcome_team": "New York Mets",
+        "scheduled_start_utc": "2026-07-27T16:05:00+00:00"
+      }
+    }
+  ]
+}
